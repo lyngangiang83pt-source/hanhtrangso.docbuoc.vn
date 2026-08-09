@@ -259,7 +259,47 @@ export async function deleteStudent(studentId) {
   return { error };
 }
 
-// 10. Thông báo hệ thống (Notifications)
+// 10. Quản Lý Môn Học (Subjects API CRUD)
+export async function getSubjects() {
+  try {
+    const { data, error } = await supabase
+      .from('subjects')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.warn('Truy vấn danh sách Môn học thất bại:', err.message);
+    return [];
+  }
+}
+
+export async function addSubject(subjectData) {
+  const { data, error } = await supabase
+    .from('subjects')
+    .insert([subjectData])
+    .select();
+  return { data, error };
+}
+
+export async function updateSubject(subjectId, updatedData) {
+  const { data, error } = await supabase
+    .from('subjects')
+    .update(updatedData)
+    .eq('id', subjectId)
+    .select();
+  return { data, error };
+}
+
+export async function deleteSubject(subjectId) {
+  const { error } = await supabase
+    .from('subjects')
+    .delete()
+    .eq('id', subjectId);
+  return { error };
+}
+
+// 11. Thông báo hệ thống (Notifications)
 export async function getNotifications() {
   try {
     const { data, error } = await supabase

@@ -129,13 +129,22 @@ export function Navbar({ activeTab, setActiveTab, onOpenAuthModal }) {
                     </div>
                     
                     {profile.role === 'teacher' || profile.role === 'admin' ? (
-                      <button
-                        onClick={() => { setActiveTab('classroom'); setShowProfileMenu(false); }}
-                        className="w-full text-left px-3 py-2 text-xs text-indigo-300 hover:bg-slate-800 rounded-lg flex items-center space-x-2"
-                      >
-                        <User className="w-4 h-4" />
-                        <span>Quản lý Lớp & Học sinh</span>
-                      </button>
+                      <>
+                        <button
+                          onClick={() => { setActiveTab('subjects'); setShowProfileMenu(false); }}
+                          className="w-full text-left px-3 py-2 text-xs text-purple-300 hover:bg-slate-800 rounded-lg flex items-center space-x-2"
+                        >
+                          <BookOpenCheck className="w-4 h-4 text-purple-400" />
+                          <span>Quản lý Môn học</span>
+                        </button>
+                        <button
+                          onClick={() => { setActiveTab('classroom'); setShowProfileMenu(false); }}
+                          className="w-full text-left px-3 py-2 text-xs text-indigo-300 hover:bg-slate-800 rounded-lg flex items-center space-x-2"
+                        >
+                          <User className="w-4 h-4 text-indigo-400" />
+                          <span>Quản lý Lớp & Học sinh</span>
+                        </button>
+                      </>
                     ) : null}
 
                     <button

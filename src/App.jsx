@@ -15,6 +15,7 @@ import { AiQaView } from './features/ai-qa/AiQaView';
 import { VipVaultView } from './features/vip-vault/VipVaultView';
 import { NotificationsView } from './features/notifications/NotificationsView';
 import { ClassroomManager } from './features/classroom/ClassroomManager';
+import { SubjectManager } from './features/classroom/SubjectManager';
 import { AuthModal } from './features/auth/AuthModal';
 
 export default function App() {
@@ -45,6 +46,7 @@ export default function App() {
           {activeTab === 'vip-vault' && <VipVaultView />}
           {activeTab === 'notifications' && <NotificationsView />}
           {activeTab === 'classroom' && <ClassroomManager />}
+          {activeTab === 'subjects' && <SubjectManager />}
         </main>
 
         {/* CHÂN TRANG (FOOTER) */}

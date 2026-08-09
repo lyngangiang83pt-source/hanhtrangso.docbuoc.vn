@@ -20,7 +20,16 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 3. BẢNG CLASSES (Quản lý Lớp học)
+-- 3. BẢNG SUBJECTS (Quản lý Môn học)
+CREATE TABLE IF NOT EXISTS public.subjects (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code TEXT UNIQUE NOT NULL, -- Mã môn (VD: VAN, TOAN, KHTN)
+    name TEXT NOT NULL, -- Tên môn (VD: Ngữ Văn, Toán Học)
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 4. BẢNG CLASSES (Quản lý Lớp học)
 CREATE TABLE IF NOT EXISTS public.classes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
@@ -141,9 +150,21 @@ CREATE TABLE IF NOT EXISTS public.vip_keys (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- ====================================================================
--- RLS POLICIES SAFE (BẢO MẬT BẢNG - TỰ ĐỘNG THAY THẾ NẾU ĐÃ TỒN TẠI)
--- ====================================================================
+ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Read Subjects" ON public.subjects;
+DROP POLICY IF EXISTS "All Access Subjects" ON public.subjects;
+CREATE POLICY "Public Read Subjects" ON public.subjects FOR SELECT USING (true);
+CREATE POLICY "All Access Subjects" ON public.subjects FOR ALL USING (true);
+
+-- DỮ LIỆU THỰC TẾ KHỞI TẠO MÔN HỌC
+INSERT INTO public.subjects (code, name, description) VALUES
+('VAN', 'Ngữ Văn', 'Môn Ngữ Văn THCS - Đọc hiểu văn bản và Làm văn nghị luận'),
+('TOAN', 'Toán Học', 'Môn Toán THCS - Đại số, Hình học trực quan và Thống kê'),
+('KHTN', 'Khoa Học Tự Nhiên', 'Môn KHTN - Tích hợp Vật Lý, Hóa Học và Sinh Học'),
+('LS_GD', 'Lịch Sử & Địa Lý', 'Môn Lịch Sử & Địa Lý THCS - Tri thức lịch sử dân tộc và địa lý Việt Nam'),
+('TIN', 'Tin Học', 'Môn Tin Học - Năng lực số (NLS) và lập trình tư duy'),
+('ENG', 'Tiếng Anh', 'Môn Tiếng Anh - Kỹ năng giao tiếp và ngữ pháp')
+ON CONFLICT (code) DO NOTHING;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
