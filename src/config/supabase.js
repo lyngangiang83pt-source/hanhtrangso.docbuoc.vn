@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Đọc thông số biến môi trường (Vite ENV)
-const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL || 'https://demo-eduteacher.supabase.co';
-const supabaseAnonKey = import.meta.env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.demo';
+// Đọc thông số biến môi trường (Vite ENV) với Fallback Supabase URL thực tế của Thầy/Cô
+const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL || 'https://qmwprqrupefjlxdlitoh.supabase.co';
+const supabaseAnonKey = import.meta.env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtd3BycXJ1cGVmamx4ZGxpdG9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwOTM0NjAsImV4cCI6MjEwMTY2OTQ2MH0.EwCpg3QfIKbTnMFZWKOKS1phWLyy6o37S0s2OEP3xpc';
 
 // Khởi tạo Supabase Client
 export const supabase = (typeof window !== 'undefined' && window.supabase?.createClient)
