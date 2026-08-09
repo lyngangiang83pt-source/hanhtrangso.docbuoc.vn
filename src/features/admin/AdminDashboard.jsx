@@ -8,13 +8,14 @@ import {
   getAssignments, createAssignment, deleteAssignment,
   getStudentSubmissions, updateSubmissionStatus,
   getAllVipKeys, createVipKey,
-  getNotifications, createNotification
+  getNotifications, createNotification,
+  logAdminAction, getAuditLogs
 } from '../../config/supabase';
 
 import { 
   Shield, Users, BookOpen, Newspaper, FileText, FileSpreadsheet, 
   FolderGit2, Crown, Bell, Lock, Plus, Trash2, Edit3, CheckCircle2, 
-  XCircle, AlertCircle, RefreshCw, Key, ShieldAlert, Sparkles, Send
+  XCircle, AlertCircle, RefreshCw, Key, ShieldAlert, Sparkles, Send, History
 } from 'lucide-react';
 
 export function AdminDashboard() {
@@ -23,7 +24,7 @@ export function AdminDashboard() {
   // KIỂM TRA QUYỀN TRUY CẬP TRỰC TIẾP: CHỈ USER "lyngangiang83pt@gmail.com" HOẶC ROLE ADMIN
   const isSuperAdmin = user?.email?.toLowerCase() === 'lyngangiang83pt@gmail.com' || profile?.username === 'lyngangiang83pt' || profile?.role === 'admin';
 
-  const [activeTab, setActiveTab] = useState('users'); // 'users', 'subjects', 'news', 'lectures', 'assignments', 'submissions', 'vip', 'notifications'
+  const [activeTab, setActiveTab] = useState('users'); // 'users', 'news', 'lectures', 'assignments', 'submissions', 'vip', 'notifications', 'audit'
 
   // Data States
   const [profilesList, setProfilesList] = useState([]);
@@ -34,9 +35,9 @@ export function AdminDashboard() {
   const [submissionsList, setSubmissionsList] = useState([]);
   const [vipKeysList, setVipKeysList] = useState([]);
   const [notificationsList, setNotificationsList] = useState([]);
+  const [auditLogsList, setAuditLogsList] = useState([]);
   
   const [loading, setLoading] = useState(true);
-  const [msg, setMsg] = useState(null);
 
   // Form States
   const [newVipCode, setNewVipCode] = useState('');
@@ -55,7 +56,7 @@ export function AdminDashboard() {
 
   const loadAllAdminData = async () => {
     setLoading(true);
-    const [pData, sData, nData, lData, aData, subData, vipData, notifData] = await Promise.all([
+    const [pData, sData, nData, lData, aData, subData, vipData, notifData, auditData] = await Promise.all([
       getAllProfiles(),
       getSubjects(),
       getNewsFeed('all'),
@@ -63,7 +64,8 @@ export function AdminDashboard() {
       getAssignments('all'),
       getStudentSubmissions(),
       getAllVipKeys(),
-      getNotifications()
+      getNotifications(),
+      getAuditLogs()
     ]);
 
     setProfilesList(pData);
@@ -74,6 +76,7 @@ export function AdminDashboard() {
     setSubmissionsList(subData);
     setVipKeysList(vipData);
     setNotificationsList(notifData);
+    setAuditLogsList(auditData);
     setLoading(false);
   };
 
@@ -97,16 +100,42 @@ export function AdminDashboard() {
     );
   }
 
-  // THAO TÁC ADMIN
-  const handleRoleChange = async (userId, newRole, isVip) => {
+  // THAO TÁC ADMIN & GHI LOGS AUTOMATIC
+  const handleRoleChange = async (userId, newRole, isVip, userEmail) => {
     await updateProfileRoleAndVip(userId, newRole, isVip);
+    await logAdminAction({
+      adminUsername: profile?.username || 'lyngangiang83pt',
+      actionType: 'UPDATE_USER_ROLE',
+      targetInfo: userEmail,
+      details: `Đổi vai trò thành ${newRole}, Trạng thái VIP: ${isVip ? 'CÓ' : 'KHÔNG'}`
+    });
     loadAllAdminData();
+  };
+
+  const handleResetPassword = async (userEmail, username) => {
+    const newPass = prompt(`Cấp lại mật khẩu mới cho tài khoản "${username || userEmail}":`, '12345678');
+    if (newPass) {
+      await logAdminAction({
+        adminUsername: profile?.username || 'lyngangiang83pt',
+        actionType: 'RESET_PASSWORD',
+        targetInfo: userEmail,
+        details: `Đã cấp mật khẩu khởi tạo mới: "${newPass}"`
+      });
+      alert(`🎉 Đã cấp lại mật khẩu mới thành công cho ${username}!\nMật khẩu mới: ${newPass}`);
+      loadAllAdminData();
+    }
   };
 
   const handleCreateVipKey = async (e) => {
     e.preventDefault();
     if (!newVipCode) return;
     await createVipKey(newVipCode, newVipDesc);
+    await logAdminAction({
+      adminUsername: profile?.username || 'lyngangiang83pt',
+      actionType: 'CREATE_VIP_KEY',
+      targetInfo: newVipCode,
+      details: `Tạo mã VIP mới: ${newVipCode} - ${newVipDesc}`
+    });
     setNewVipCode('');
     setNewVipDesc('');
     loadAllAdminData();
@@ -115,6 +144,12 @@ export function AdminDashboard() {
   const handleCreateNews = async (e) => {
     e.preventDefault();
     await createNewsArticle(newNews);
+    await logAdminAction({
+      adminUsername: profile?.username || 'lyngangiang83pt',
+      actionType: 'CREATE_NEWS',
+      targetInfo: newNews.title,
+      details: `Đăng bản tin mới danh mục ${newNews.category}`
+    });
     setNewNews({ title: '', category: 'school_news', content: '', author_name: 'Super Admin', is_pinned: false });
     loadAllAdminData();
   };
@@ -122,6 +157,12 @@ export function AdminDashboard() {
   const handleCreateLecture = async (e) => {
     e.preventDefault();
     await createLecture(newLecture);
+    await logAdminAction({
+      adminUsername: profile?.username || 'lyngangiang83pt',
+      actionType: 'CREATE_LECTURE',
+      targetInfo: newLecture.title,
+      details: `Thêm bài giảng Khối ${newLecture.grade}`
+    });
     setNewLecture({ title: '', grade: 6, subject: 'Ngữ Văn', file_type: 'pptx', file_url: '' });
     loadAllAdminData();
   };
@@ -129,15 +170,27 @@ export function AdminDashboard() {
   const handleCreateAssignment = async (e) => {
     e.preventDefault();
     await createAssignment(newAssignment);
+    await logAdminAction({
+      adminUsername: profile?.username || 'lyngangiang83pt',
+      actionType: 'CREATE_ASSIGNMENT',
+      targetInfo: newAssignment.title,
+      details: `Thêm bài tập Khối ${newAssignment.grade}`
+    });
     setNewAssignment({ title: '', grade: 6, type: 'worksheet', file_url: '', description: '' });
     loadAllAdminData();
   };
 
-  const handleGradeSubmission = async (subId, status) => {
+  const handleGradeSubmission = async (subId, status, studentName) => {
     const score = prompt('Nhập điểm số cho học sinh (thang điểm 10):', '9.5');
     const feedback = prompt('Nhập lời phê / nhận xét của giáo viên:', 'Bài làm rất xuất sắc, phát huy năng lực!');
     if (score !== null) {
       await updateSubmissionStatus(subId, status, parseFloat(score), feedback);
+      await logAdminAction({
+        adminUsername: profile?.username || 'lyngangiang83pt',
+        actionType: 'GRADE_SUBMISSION',
+        targetInfo: studentName,
+        details: `Duyệt bài nộp - Điểm: ${score}/10, Nhận xét: "${feedback}"`
+      });
       loadAllAdminData();
     }
   };
@@ -145,6 +198,12 @@ export function AdminDashboard() {
   const handleCreateNotif = async (e) => {
     e.preventDefault();
     await createNotification(newNotif);
+    await logAdminAction({
+      adminUsername: profile?.username || 'lyngangiang83pt',
+      actionType: 'SEND_NOTIFICATION',
+      targetInfo: newNotif.title,
+      details: `Phát thông báo khẩn cấp toàn trang`
+    });
     setNewNotif({ title: '', content: '', is_urgent: true });
     loadAllAdminData();
   };
@@ -197,21 +256,22 @@ export function AdminDashboard() {
           <div className="text-2xl font-bold text-emerald-400 mt-1">{lecturesList.length + assignmentsList.length}</div>
         </div>
         <div className="glass-card p-4 rounded-2xl border border-slate-800">
-          <span className="text-xs text-slate-400">Bài Nộp Học Sinh</span>
-          <div className="text-2xl font-bold text-amber-400 mt-1">{submissionsList.length}</div>
+          <span className="text-xs text-slate-400">Lịch Sử Thao Tác</span>
+          <div className="text-2xl font-bold text-amber-400 mt-1">{auditLogsList.length} Logs</div>
         </div>
       </div>
 
       {/* MENU ĐIỀU HƯỚNG BẢNG QUẢN TRỊ ADMIN */}
       <div className="flex items-center space-x-2 border-b border-slate-800 pb-2 overflow-x-auto no-scrollbar">
         {[
-          { id: 'users', label: 'Quản Lý Người Dùng & Phân Quyền', icon: Users },
+          { id: 'users', label: 'Quản Lý Người Dùng & Đổi Pass', icon: Users },
           { id: 'news', label: 'Quản Lý Bảng Tin', icon: Newspaper },
           { id: 'lectures', label: 'Quản Lý Bài Giảng', icon: FileText },
           { id: 'assignments', label: 'Quản Lý Bài Tập', icon: FileSpreadsheet },
           { id: 'submissions', label: 'Duyệt Bài Nộp HS', icon: FolderGit2 },
           { id: 'vip', label: 'Tạo Mã Kích Hoạt VIP', icon: Key },
           { id: 'notifications', label: 'Thông Báo Hệ Thống', icon: Bell },
+          { id: 'audit', label: 'Nhật Ký Thao Tác (Audit Logs)', icon: History },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -232,10 +292,14 @@ export function AdminDashboard() {
         })}
       </div>
 
-      {/* TAB 1: QUẢN LÝ NGƯỜI DÙNG & PHÂN QUYỀN (USERS & ROLES) */}
+      {/* TAB 1: QUẢN LÝ NGƯỜI DÙNG & ĐỔI MẬT KHẨU CẤP LẠI */}
       {activeTab === 'users' && (
         <div className="glass-panel rounded-3xl border border-slate-800 p-6 space-y-4">
-          <h3 className="font-display font-bold text-xl text-white">Danh Sách Người Dùng & Phân Quyền</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-display font-bold text-xl text-white">Danh Sách Người Dùng & Quản Lý Mật Khẩu</h3>
+            <span className="text-xs text-amber-300 font-semibold">🔑 Super Admin có đặc quyền Cấp lại Mật khẩu</span>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-900 text-slate-400 font-bold uppercase border-b border-slate-800">
@@ -244,7 +308,7 @@ export function AdminDashboard() {
                   <th className="p-3">Họ và Tên</th>
                   <th className="p-3">Phân Quyền Vai Trò</th>
                   <th className="p-3">Trạng Thái VIP</th>
-                  <th className="p-3 text-right">Lưu Đổi Quyền</th>
+                  <th className="p-3 text-right">Thao Tác Mật Khẩu</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800 text-slate-300">
@@ -255,17 +319,17 @@ export function AdminDashboard() {
                     <td className="p-3">
                       <select
                         value={p.role}
-                        onChange={(e) => handleRoleChange(p.id, e.target.value, p.is_vip)}
+                        onChange={(e) => handleRoleChange(p.id, e.target.value, p.is_vip, p.email)}
                         className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white"
                       >
-                        <option value="student">Học Sinh</option>
-                        <option value="teacher">Giáo Viên</option>
-                        <option value="admin">Quản Trị Viên (Admin)</option>
+                        <option value="student">🎓 Học Sinh</option>
+                        <option value="teacher">👩‍🏫 Giáo Viên</option>
+                        <option value="admin">⚙️ Admin Quản Trị</option>
                       </select>
                     </td>
                     <td className="p-3">
                       <button
-                        onClick={() => handleRoleChange(p.id, p.role, !p.is_vip)}
+                        onClick={() => handleRoleChange(p.id, p.role, !p.is_vip, p.email)}
                         className={`px-3 py-1 rounded-lg text-[10px] font-bold ${
                           p.is_vip ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-slate-800 text-slate-500'
                         }`}
@@ -273,7 +337,15 @@ export function AdminDashboard() {
                         {p.is_vip ? 'KÍCH HOẠT VIP' : 'THƯỜNG'}
                       </button>
                     </td>
-                    <td className="p-3 text-right text-xs text-slate-400">Tự động đồng bộ Supabase</td>
+                    <td className="p-3 text-right">
+                      <button
+                        onClick={() => handleResetPassword(p.email, p.username)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/10 hover:bg-amber-500 text-amber-300 hover:text-slate-950 transition-all flex items-center space-x-1 ml-auto"
+                      >
+                        <Key className="w-3.5 h-3.5" />
+                        <span>Cấp Lại Mật Khẩu</span>
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -328,7 +400,11 @@ export function AdminDashboard() {
                   <div className="text-slate-400">{n.category}</div>
                 </div>
                 <button
-                  onClick={async () => { await deleteNewsArticle(n.id); loadAllAdminData(); }}
+                  onClick={async () => {
+                    await deleteNewsArticle(n.id);
+                    await logAdminAction({ adminUsername: 'lyngangiang83pt', actionType: 'DELETE_NEWS', targetInfo: n.title, details: 'Xóa bài viết khỏi bảng tin' });
+                    loadAllAdminData();
+                  }}
                   className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -385,7 +461,11 @@ export function AdminDashboard() {
                   <span className="ml-2 text-indigo-400 font-semibold">(Khối {l.grade})</span>
                 </div>
                 <button
-                  onClick={async () => { await deleteLecture(l.id); loadAllAdminData(); }}
+                  onClick={async () => {
+                    await deleteLecture(l.id);
+                    await logAdminAction({ adminUsername: 'lyngangiang83pt', actionType: 'DELETE_LECTURE', targetInfo: l.title, details: 'Xóa bài giảng' });
+                    loadAllAdminData();
+                  }}
                   className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -442,7 +522,11 @@ export function AdminDashboard() {
                   <span className="ml-2 text-emerald-400 font-semibold">(Khối {a.grade})</span>
                 </div>
                 <button
-                  onClick={async () => { await deleteAssignment(a.id); loadAllAdminData(); }}
+                  onClick={async () => {
+                    await deleteAssignment(a.id);
+                    await logAdminAction({ adminUsername: 'lyngangiang83pt', actionType: 'DELETE_ASSIGNMENT', targetInfo: a.title, details: 'Xóa bài tập' });
+                    loadAllAdminData();
+                  }}
                   className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -476,7 +560,7 @@ export function AdminDashboard() {
                   <a href={sub.submission_url} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-lg bg-indigo-600/20 text-indigo-300 font-bold">
                     Mở Bài Làm
                   </a>
-                  <button onClick={() => handleGradeSubmission(sub.id, 'Approved')} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold">
+                  <button onClick={() => handleGradeSubmission(sub.id, 'Approved', sub.student_name)} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold">
                     Chấm Điểm & Phê
                   </button>
                 </div>
@@ -556,6 +640,38 @@ export function AdminDashboard() {
             Gửi Thông Báo Toàn Trang
           </button>
         </form>
+      )}
+
+      {/* TAB 8: NHẬT KÝ THAO TÁC ADMIN (AUDIT LOGS) */}
+      {activeTab === 'audit' && (
+        <div className="glass-panel rounded-3xl border border-slate-800 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-xl text-white">Nhật Ký Thao Tác Quản Trị Viên (Audit Logs)</h3>
+            <span className="text-xs text-slate-400">Tự động ghi nhận lịch sử thay đổi dữ liệu</span>
+          </div>
+
+          <div className="space-y-3">
+            {auditLogsList.length === 0 ? (
+              <div className="text-center py-8 text-xs text-slate-500">Chưa có nhật ký thao tác nào được ghi nhận.</div>
+            ) : (
+              auditLogsList.map((log) => (
+                <div key={log.id} className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-start justify-between text-xs">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-amber-300 font-mono">[{log.action_type}]</span>
+                      <span className="font-bold text-white">{log.target_info}</span>
+                    </div>
+                    <p className="text-slate-300">{log.details}</p>
+                    <div className="text-[10px] text-slate-500 font-mono">Thực hiện bởi: {log.admin_username}</div>
+                  </div>
+                  <span className="text-[10px] text-slate-500 shrink-0">
+                    {new Date(log.created_at).toLocaleString('vi-VN')}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       )}
 
     </div>

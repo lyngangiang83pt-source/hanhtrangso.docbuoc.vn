@@ -155,6 +155,16 @@ CREATE TABLE IF NOT EXISTS public.vip_keys (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 14. BẢNG AUDIT_LOGS (Nhật Ký Thao Tác Quản Trị Viên)
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    admin_username TEXT NOT NULL,
+    action_type TEXT NOT NULL, -- VD: 'RESET_PASSWORD', 'CHANGE_ROLE', 'DELETE_LECTURE', 'CREATE_VIP'
+    target_info TEXT,
+    details TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- ====================================================================
 -- RLS POLICIES SAFE
 -- ====================================================================
@@ -190,9 +200,12 @@ DROP POLICY IF EXISTS "Public Read Notifications" ON public.notifications;
 DROP POLICY IF EXISTS "Public Read Classes" ON public.classes;
 DROP POLICY IF EXISTS "Public Read Students" ON public.students;
 DROP POLICY IF EXISTS "All Access Vip" ON public.vip_keys;
+DROP POLICY IF EXISTS "All Access Audit" ON public.audit_logs;
 
 CREATE POLICY "Public Read Profiles" ON public.profiles FOR SELECT USING (true);
 CREATE POLICY "All Access Profiles" ON public.profiles FOR ALL USING (true);
+CREATE POLICY "All Access Vip" ON public.vip_keys FOR ALL USING (true);
+CREATE POLICY "All Access Audit" ON public.audit_logs FOR ALL USING (true);
 CREATE POLICY "Public Read Subjects" ON public.subjects FOR SELECT USING (true);
 CREATE POLICY "All Access Subjects" ON public.subjects FOR ALL USING (true);
 CREATE POLICY "Public Read News" ON public.news_feed FOR SELECT USING (true);

@@ -289,6 +289,30 @@ export async function deleteAssignment(id) {
 export async function createNotification(notifData) {
   return await supabase.from('notifications').insert([notifData]).select();
 }
+
+// 12. Nhật Ký Thao Tác Quản Trị Viên (Audit Logs)
+export async function logAdminAction({ adminUsername, actionType, targetInfo, details }) {
+  try {
+    await supabase.from('audit_logs').insert([{
+      admin_username: adminUsername || 'lyngangiang83pt',
+      action_type: actionType,
+      target_info: targetInfo,
+      details: details
+    }]);
+  } catch (err) {
+    console.warn('Ghi log thất bại:', err.message);
+  }
+}
+
+export async function getAuditLogs() {
+  try {
+    const { data, error } = await supabase.from('audit_logs').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    return [];
+  }
+}
 export async function activateVipCode(code, userEmail) {
   try {
     // Kiểm tra mã VIP
