@@ -1,10 +1,10 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Đọc Gemini API Key từ ENV
 const apiKey = import.meta.env?.VITE_GEMINI_API_KEY || '';
 
 // Khởi tạo Gemini Client
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+const ai = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 /**
  * Gửi tin nhắn tới Chatbot Hỏi - Đáp 24/24
@@ -20,14 +20,9 @@ export async function askGeminiAi(userPrompt, conversationHistory = []) {
 Hãy trả lời câu hỏi bài học một cách chính xác, ngắn gọn, trình bày rõ ràng với Markdown và công thức dễ hiểu.
 Nếu học sinh hỏi về các môn học (Ngữ Văn, Toán, KHTN, Lịch Sử, Tiếng Anh, Tin học...), hãy giảng giải chi tiết từng bước.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [
-        { role: 'user', parts: [{ text: `${systemInstruction}\n\nCâu hỏi: ${userPrompt}` }] }
-      ]
-    });
-
-    return response.text || 'Xin lỗi, trợ lý AI hiện đang bận. Thầy/Cô và học sinh hãy thử lại sau nhé!';
+    const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const response = await model.generateContent(`${systemInstruction}\n\nCâu hỏi: ${userPrompt}`);
+    return response.response.text() || 'Xin lỗi, trợ lý AI hiện đang bận. Thầy/Cô và học sinh hãy thử lại sau nhé!';
   } catch (error) {
     console.warn('Lỗi gọi Gemini API:', error.message);
     return getSmartOfflineResponse(userPrompt);
@@ -54,12 +49,9 @@ export async function askGeminiVipAssistant(taskType, topic, parameters = {}) {
       prompt = `Hỗ trợ giáo viên xử lý công việc: ${topic}`;
     }
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [{ role: 'user', parts: [{ text: prompt }] }]
-    });
-
-    return response.text || 'Dịch vụ AI VIP chưa thể xử lý yêu cầu lúc này.';
+    const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const response = await model.generateContent(prompt);
+    return response.response.text() || 'Dịch vụ AI VIP chưa thể xử lý yêu cầu lúc này.';
   } catch (error) {
     return getVipOfflineSample(taskType, topic);
   }
