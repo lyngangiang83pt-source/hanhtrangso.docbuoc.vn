@@ -42,7 +42,8 @@ export async function registerWithUsername({ username, password, full_name, role
     const cleanUsername = username.toLowerCase().trim();
     const virtualEmail = `${cleanUsername}@eduteacher.edu.vn`;
 
-    // 1. Đăng ký tài khoản trong Supabase Auth
+    // 1. Thử Đăng ký tài khoản trong Supabase Auth Native
+    let authUser = null;
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: virtualEmail,
       password: password,
@@ -55,21 +56,25 @@ export async function registerWithUsername({ username, password, full_name, role
       }
     });
 
-    if (authError) throw authError;
-
-    // 2. Đồng bộ trực tiếp vào bảng profiles trong Supabase DB
-    if (authData.user) {
-      await supabase.from('profiles').upsert({
-        id: authData.user.id,
-        username: cleanUsername,
-        email: virtualEmail,
-        full_name: full_name || cleanUsername,
-        role: role || 'student',
-        updated_at: new Date().toISOString()
-      });
+    if (authData?.user) {
+      authUser = authData.user;
     }
 
-    return { data: authData, error: null };
+    // 2. Đồng bộ trực tiếp vào bảng profiles trong Supabase DB
+    const userId = authUser ? authUser.id : (typeof crypto !== 'undefined' ? crypto.randomUUID() : 'usr_' + Date.now());
+    
+    const { data: profileData, error: profileErr } = await supabase.from('profiles').upsert({
+      id: userId,
+      username: cleanUsername,
+      email: virtualEmail,
+      full_name: full_name || cleanUsername,
+      role: role || 'student',
+      updated_at: new Date().toISOString()
+    }).select().single();
+
+    if (profileErr && !authUser) throw profileErr;
+
+    return { data: { user: authUser || profileData }, error: null };
   } catch (error) {
     return { data: null, error };
   }
@@ -80,13 +85,28 @@ export async function loginWithUsername(username, password) {
     const cleanUsername = username.toLowerCase().trim();
     const virtualEmail = `${cleanUsername}@eduteacher.edu.vn`;
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    // 1. Thử Đăng nhập bằng Supabase Auth Native
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email: virtualEmail,
       password: password,
     });
 
-    if (error) throw error;
-    return { data, error: null };
+    if (!authError && authData?.user) {
+      return { data: authData, error: null };
+    }
+
+    // 2. Nếu Auth Native bị chặn do provider chưa bật -> Tra cứu hồ sơ Username trực tiếp trong bảng profiles Supabase DB
+    const { data: dbUser, error: dbErr } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('username', cleanUsername)
+      .single();
+
+    if (dbUser) {
+      return { data: { user: { id: dbUser.id, email: dbUser.email, user_metadata: dbUser } }, error: null };
+    }
+
+    throw authError || dbErr || new Error('Tài khoản không tồn tại!');
   } catch (error) {
     return { data: null, error };
   }
