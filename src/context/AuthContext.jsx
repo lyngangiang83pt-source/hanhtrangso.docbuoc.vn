@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase, getUserProfile } from '../config/supabase';
+import { supabase, getUserProfile, registerWithUsername as apiRegister, loginWithUsername as apiLogin } from '../config/supabase';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState({
+    username: 'guest',
     full_name: 'Khách Ghé Thăm',
     role: 'student', // 'admin', 'teacher', 'student'
     is_vip: false,
@@ -31,7 +32,7 @@ export const AuthProvider = ({ children }) => {
 
     initSession();
 
-    // 2. Lắng nghe thay đổi auth state (Login / Logout / OAuth)
+    // 2. Lắng nghe thay đổi auth state (Login / Logout / SignUp)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setUser(session.user);
@@ -39,6 +40,7 @@ export const AuthProvider = ({ children }) => {
       } else {
         setUser(null);
         setProfile({
+          username: 'guest',
           full_name: 'Khách Ghé Thăm',
           role: 'student',
           is_vip: false,
@@ -59,6 +61,18 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Đăng Ký bằng Username + Mật khẩu
+  const signUpWithUsername = async ({ username, password, full_name, role }) => {
+    const res = await apiRegister({ username, password, full_name, role });
+    return res;
+  };
+
+  // Đăng Nhập bằng Username + Mật khẩu
+  const signInWithUsername = async (username, password) => {
+    const res = await apiLogin(username, password);
+    return res;
+  };
+
   // Đăng nhập bằng Google ("Continue with Google")
   const signInWithGoogle = async () => {
     try {
@@ -76,25 +90,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Đăng nhập Email/Mật khẩu (Demo / Fallback)
-  const signInWithEmail = async (email, password) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
-    }
-  };
-
   // Đăng xuất
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
     setProfile({
+      username: 'guest',
       full_name: 'Khách Ghé Thăm',
       role: 'student',
       is_vip: false,
@@ -102,7 +103,7 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
-  // Giả lập Đổi Vai Trò Nhanh (Dành cho Giáo viên / Admin Test giao diện)
+  // Giả lập Đổi Vai Trò Nhanh
   const switchRole = (newRole) => {
     setProfile(prev => ({ ...prev, role: newRole }));
   };
@@ -117,8 +118,9 @@ export const AuthProvider = ({ children }) => {
       user,
       profile,
       loading,
+      signUpWithUsername,
+      signInWithUsername,
       signInWithGoogle,
-      signInWithEmail,
       signOut,
       switchRole,
       enableVip,

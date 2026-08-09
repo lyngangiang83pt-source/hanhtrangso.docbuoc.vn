@@ -9,6 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- 2. BẢNG PROFILES (Thông tin Người dùng & Phân quyền RBAC)
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     full_name TEXT NOT NULL DEFAULT 'Thành viên EdTech',
     role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('admin', 'teacher', 'student')),
@@ -200,17 +201,23 @@ CREATE POLICY "All Access Vip" ON public.vip_keys FOR ALL USING (true);
 -- ====================================================================
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+    user_name_val TEXT;
 BEGIN
-    INSERT INTO public.profiles (id, email, full_name, role, avatar_url)
+    user_name_val := COALESCE(NEW.raw_user_meta_data->>'username', split_part(NEW.email, '@', 1));
+
+    INSERT INTO public.profiles (id, username, email, full_name, role, avatar_url)
     VALUES (
         NEW.id,
+        user_name_val,
         NEW.email,
-        COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', 'Thành viên EdTech'),
-        'student',
+        COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', user_name_val),
+        COALESCE(NEW.raw_user_meta_data->>'role', 'student'),
         NEW.raw_user_meta_data->>'avatar_url'
     )
     ON CONFLICT (id) DO UPDATE SET
         full_name = EXCLUDED.full_name,
+        role = EXCLUDED.role,
         avatar_url = EXCLUDED.avatar_url;
     RETURN NEW;
 END;

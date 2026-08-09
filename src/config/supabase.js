@@ -13,7 +13,62 @@ export const supabase = (typeof window !== 'undefined' && window.supabase?.creat
 // SUPABASE DATABASE API HELPERS (THAO TÁC CƠ SỞ DỮ LIỆU THỰC TẾ)
 // ====================================================================
 
-// 1. Quản lý Profiles & User Roles
+// 1. Quản lý Profiles, Authentication & Phân quyền User Roles (Username + Password)
+export async function registerWithUsername({ username, password, full_name, role }) {
+  try {
+    const cleanUsername = username.toLowerCase().trim();
+    const virtualEmail = `${cleanUsername}@eduteacher.edu.vn`;
+
+    // 1. Đăng ký tài khoản trong Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: virtualEmail,
+      password: password,
+      options: {
+        data: {
+          username: cleanUsername,
+          full_name: full_name || cleanUsername,
+          role: role || 'student',
+        }
+      }
+    });
+
+    if (authError) throw authError;
+
+    // 2. Đồng bộ trực tiếp vào bảng profiles trong Supabase DB
+    if (authData.user) {
+      await supabase.from('profiles').upsert({
+        id: authData.user.id,
+        username: cleanUsername,
+        email: virtualEmail,
+        full_name: full_name || cleanUsername,
+        role: role || 'student',
+        updated_at: new Date().toISOString()
+      });
+    }
+
+    return { data: authData, error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
+}
+
+export async function loginWithUsername(username, password) {
+  try {
+    const cleanUsername = username.toLowerCase().trim();
+    const virtualEmail = `${cleanUsername}@eduteacher.edu.vn`;
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: virtualEmail,
+      password: password,
+    });
+
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
+}
+
 export async function getUserProfile(userId) {
   try {
     const { data, error } = await supabase
