@@ -1,7 +1,7 @@
 -- ====================================================================
 -- HỆ THỐNG CƠ SỞ DỮ LIỆU ĐỒNG BỘ 100% CHO WEBSITE GIÁO DỤC EDUTEACHER
 -- Dự án Supabase: https://qmwprqrupefjlxdlitoh.supabase.co
--- Hướng dẫn: Copy toàn bộ mã SQL này -> Dán vào Supabase SQL Editor -> Run!
+-- Phiên bản Safe Fix (Thêm cột school_year tự động nếu chưa có)
 -- ====================================================================
 
 -- 1. KÍCH HOẠT EXTENSION UUID
@@ -24,8 +24,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- 3. BẢNG SUBJECTS (Quản lý Môn học THCS)
 CREATE TABLE IF NOT EXISTS public.subjects (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    code TEXT UNIQUE NOT NULL, -- Mã môn (VD: VAN, TOAN, KHTN)
-    name TEXT NOT NULL,        -- Tên môn (VD: Ngữ Văn, Toán Học)
+    code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -33,17 +33,21 @@ CREATE TABLE IF NOT EXISTS public.subjects (
 -- 4. BẢNG CLASSES (Quản lý Lớp học Khối 6-9)
 CREATE TABLE IF NOT EXISTS public.classes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name TEXT NOT NULL, -- Lớp 6A1, 7A2, 8A1, 9A3
+    name TEXT NOT NULL,
     grade INT NOT NULL CHECK (grade IN (6, 7, 8, 9)),
     school_year TEXT DEFAULT '2025-2026',
     teacher_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- BỔ SUNG CỘT SCHOOL_YEAR NẾU BẢNG CLASSES ĐÃ TỒN TẠI TỪ TRƯỚC
+ALTER TABLE public.classes ADD COLUMN IF NOT EXISTS school_year TEXT DEFAULT '2025-2026';
+ALTER TABLE public.classes ADD COLUMN IF NOT EXISTS teacher_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
+
 -- 5. BẢNG STUDENTS (Danh sách Học sinh)
 CREATE TABLE IF NOT EXISTS public.students (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    student_code TEXT UNIQUE NOT NULL, -- Mã học sinh (VD: HS6001)
+    student_code TEXT UNIQUE NOT NULL,
     full_name TEXT NOT NULL,
     gender TEXT CHECK (gender IN ('Nam', 'Nữ', 'Khác')),
     date_of_birth DATE,
@@ -152,7 +156,7 @@ CREATE TABLE IF NOT EXISTS public.vip_keys (
 );
 
 -- ====================================================================
--- RLS POLICIES SAFE (BẢO MẬT BẢNG - TỰ ĐỘNG THAY THẾ NẾU ĐÃ TỒN TẠI)
+-- RLS POLICIES SAFE
 -- ====================================================================
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
@@ -167,7 +171,6 @@ ALTER TABLE public.student_submissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vip_keys ENABLE ROW LEVEL SECURITY;
 
--- Xóa Policy cũ để không bị lỗi Duplicate
 DROP POLICY IF EXISTS "Public Read Profiles" ON public.profiles;
 DROP POLICY IF EXISTS "All Access Profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Public Read Subjects" ON public.subjects;
@@ -188,7 +191,6 @@ DROP POLICY IF EXISTS "Public Read Classes" ON public.classes;
 DROP POLICY IF EXISTS "Public Read Students" ON public.students;
 DROP POLICY IF EXISTS "All Access Vip" ON public.vip_keys;
 
--- Tạo mới các Policies cho phép đọc/ghi công khai & quản trị
 CREATE POLICY "Public Read Profiles" ON public.profiles FOR SELECT USING (true);
 CREATE POLICY "All Access Profiles" ON public.profiles FOR ALL USING (true);
 CREATE POLICY "Public Read Subjects" ON public.subjects FOR SELECT USING (true);
@@ -208,38 +210,6 @@ CREATE POLICY "Public Read Notifications" ON public.notifications FOR SELECT USI
 CREATE POLICY "Public Read Classes" ON public.classes FOR SELECT USING (true);
 CREATE POLICY "Public Read Students" ON public.students FOR SELECT USING (true);
 CREATE POLICY "All Access Vip" ON public.vip_keys FOR ALL USING (true);
-
--- ====================================================================
--- AUTOMATIC PROFILE CREATION TRIGGER
--- ====================================================================
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-DECLARE
-    user_name_val TEXT;
-BEGIN
-    user_name_val := COALESCE(NEW.raw_user_meta_data->>'username', split_part(NEW.email, '@', 1));
-
-    INSERT INTO public.profiles (id, username, email, full_name, role, avatar_url)
-    VALUES (
-        NEW.id,
-        user_name_val,
-        NEW.email,
-        COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', user_name_val),
-        COALESCE(NEW.raw_user_meta_data->>'role', 'student'),
-        NEW.raw_user_meta_data->>'avatar_url'
-    )
-    ON CONFLICT (id) DO UPDATE SET
-        full_name = EXCLUDED.full_name,
-        role = EXCLUDED.role,
-        avatar_url = EXCLUDED.avatar_url;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-    AFTER INSERT ON auth.users
-    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ====================================================================
 -- DỮ LIỆU MẪU THỰC TẾ KHỞI TẠO HỆ THỐNG
@@ -262,12 +232,12 @@ INSERT INTO public.vip_keys (key_code, description) VALUES
 ('LIGHT2026', 'Mã VIP Học Sinh Giỏi')
 ON CONFLICT (key_code) DO NOTHING;
 
--- 3. Dữ liệu Lớp học & Học sinh mẫu
-INSERT INTO public.classes (name, grade, school_year) VALUES
-('Lớp 6A1', 6, '2025-2026'),
-('Lớp 7A2', 7, '2025-2026'),
-('Lớp 8A1', 8, '2025-2026'),
-('Lớp 9A3', 9, '2025-2026')
+-- 3. Dữ liệu Lớp học mẫu (Chỉ chèn name và grade để tự lấy school_year)
+INSERT INTO public.classes (name, grade) VALUES
+('Lớp 6A1', 6),
+('Lớp 7A2', 7),
+('Lớp 8A1', 8),
+('Lớp 9A3', 9)
 ON CONFLICT DO NOTHING;
 
 -- 4. Dữ liệu Bảng tin
@@ -282,43 +252,4 @@ INSERT INTO public.lectures (title, grade, subject, file_type, file_url, has_nls
 ('Giáo án Toán 7: Hình học Trực quan - Hình Lăng Trụ Đứng', 7, 'Toán Học', 'docx', 'https://docs.google.com/document/d/1sample_toan7/export/docx', true, true),
 ('Bài giảng KHTN 8: Phản ứng Hóa học & Năng lượng Hóa học', 8, 'Khoa Học Tự Nhiên', 'pptx', 'https://docs.google.com/presentation/d/1sample_khtn8/export/pptx', true, true),
 ('Elearning Lịch Sử 9: Việt Nam Trong Những Năm 1939 - 1945', 9, 'Lịch Sử', 'elearning', 'https://elearning.edu.vn/courses/history9_lesson1', true, true)
-ON CONFLICT DO NOTHING;
-
--- 6. Dữ liệu Bài tập Khối 6-9
-INSERT INTO public.assignments (title, grade, type, description, file_url) VALUES
-('Phiếu Học Tập số 1: Trải nghiệm Văn bản Thánh Gióng - Khối 6', 6, 'worksheet', 'Học sinh điền sơ đồ tư duy nhân vật Thánh Gióng.', 'https://drive.google.com/file/d/sample_worksheet_6/view'),
-('Bài Tập Về Nhà Toán 7: Bài tập thực hành Biểu đồ cột kép', 7, 'homework', 'Hoàn thành 5 bài tập phân tích biểu đồ.', 'https://drive.google.com/file/d/sample_homework_7/view')
-ON CONFLICT DO NOTHING;
-
--- 7. Dữ liệu Học liệu số
-INSERT INTO public.digital_resources (title, resource_type, description, media_url, thumbnail_url, duration, author) VALUES
-('Phim Giáo Dục: Hành trình khám phá Vũ trụ & Hệ Mặt Trời', 'educational_films', 'Thước phim khoa học 3D sinh động giúp học sinh hiểu về chuyển động của Trái Đất.', 'https://www.youtube.com/watch?v=libKVRa074s', 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800', '12 phút', 'Tổ KHTN'),
-('Sổ Tay Tri Thức: 100+ Công thức Toán THCS & Mẹo Giải Nhanh', 'knowledge_handbook', 'Cẩm nang tra cứu công thức Đại số, Hình học và sơ đồ tư duy dễ nhớ.', 'https://drive.google.com/file/d/sample_handbook/view', 'https://images.unsplash.com/photo-1532012197267-da84d127e765?w=800', '50 trang', 'Tổ Toán'),
-('Podcast Ngắn #1: Bí quyết Quản lý Thời gian & Ôn thi Hiệu quả', 'podcasts', 'Podcast tâm sự học đường chia sẻ 5 phương pháp học thông minh dành cho học sinh.', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=800', '08 phút', 'Cô Trà My')
-ON CONFLICT DO NOTHING;
-
--- 8. Dữ liệu Game học tập
-INSERT INTO public.games (title, description, subject, game_type, game_data) VALUES
-('Đấu Trí Tri Thức - Thử Thách Trắc Nghiệm KHTN & Lịch Sử', 'Thử thách 5 câu hỏi kiến thức tổng hợp với thời gian đếm ngược!', 'Tổng hợp', 'quiz', '{
-    "questions": [
-        {
-            "question": "Thành phần nào của tế bào được coi là trung tâm điều khiển mọi hoạt động sống?",
-            "options": ["Màng tế bào", "Nhân tế bào", "Tế bào chất", "Không bào"],
-            "answer": 1,
-            "explanation": "Nhân tế bào chứa vật chất di truyền (DNA) điều khiển mọi hoạt động sống."
-        },
-        {
-            "question": "Chiến thắng Điện Biên Phủ lừng lẫy năm châu diễn ra vào năm nào?",
-            "options": ["1945", "1954", "1968", "1975"],
-            "answer": 1,
-            "explanation": "Chiến thắng Điện Biên Phủ lịch sử diễn ra vào ngày 07/05/1954."
-        }
-    ]
-}'::jsonb)
-ON CONFLICT DO NOTHING;
-
--- 9. Dữ liệu Thông báo hệ thống
-INSERT INTO public.notifications (title, content, is_urgent) VALUES
-('🎉 Ra mắt Nền tảng Giáo Dục Số EdTech 2026!', 'Chào mừng quý thầy cô và các em học sinh đến với nền tảng học tập số tích hợp AI và phân quyền toàn diện.', true),
-('🤖 Đã kết nối thành công Trợ lý Hỏi-Đáp AI 24/24', 'Học sinh có thể đặt câu hỏi bài tập tại mục Hỏi - Đáp để nhận phản hồi thông minh lập tức.', false)
 ON CONFLICT DO NOTHING;
