@@ -17,6 +17,7 @@ export const navItems = [
   { id: 'ai-qa', label: 'Hỏi - đáp', icon: MessageSquareCode },
   { id: 'vip-vault', label: 'Kho VIP', icon: Crown, isVip: true },
   { id: 'notifications', label: 'Thông báo', icon: Bell },
+  { id: 'admin', label: 'Admin Quản Trị', icon: Shield, isAdmin: true },
 ];
 
 export function Navbar({ activeTab, setActiveTab, onOpenAuthModal }) {
@@ -53,27 +54,30 @@ export function Navbar({ activeTab, setActiveTab, onOpenAuthModal }) {
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
+              const isSuperAdmin = user?.email?.toLowerCase() === 'lyngangiang83pt@gmail.com' || profile?.username === 'lyngangiang83pt' || profile?.role === 'admin';
+
+              if (item.isAdmin && !isSuperAdmin) return null;
+
               return (
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
                   className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
                     isActive 
-                      ? item.isVip
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-lg shadow-amber-500/10'
-                        : 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 shadow-lg shadow-indigo-500/10' 
-                      : item.isVip
-                        ? 'text-amber-400 hover:bg-amber-500/10 hover:text-amber-300'
-                        : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                      ? item.isAdmin
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/20'
+                        : item.isVip
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-lg shadow-amber-500/10'
+                          : 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 shadow-lg shadow-indigo-500/10' 
+                      : item.isAdmin
+                        ? 'text-amber-400 font-bold hover:bg-amber-500/10'
+                        : item.isVip
+                          ? 'text-amber-400 hover:bg-amber-500/10 hover:text-amber-300'
+                          : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${item.isVip ? 'text-amber-400' : ''}`} />
+                  <Icon className={`w-4 h-4 ${item.isAdmin ? 'text-amber-400' : item.isVip ? 'text-amber-400' : ''}`} />
                   <span>{item.label}</span>
-                  {item.isVip && (
-                    <span className="ml-1 px-1.5 py-0.5 text-[9px] font-extrabold bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 rounded-full animate-pulse">
-                      VIP
-                    </span>
-                  )}
                 </button>
               );
             })}

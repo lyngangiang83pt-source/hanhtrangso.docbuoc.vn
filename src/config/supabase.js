@@ -14,6 +14,29 @@ export const supabase = (typeof window !== 'undefined' && window.supabase?.creat
 // ====================================================================
 
 // 1. Quản lý Profiles, Authentication & Phân quyền User Roles (Username + Password)
+export async function getAllProfiles() {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.warn('Truy vấn danh sách Profiles thất bại:', err.message);
+    return [];
+  }
+}
+
+export async function updateProfileRoleAndVip(userId, role, isVip) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ role, is_vip: isVip, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+    .select();
+  return { data, error };
+}
+
 export async function registerWithUsername({ username, password, full_name, role }) {
   try {
     const cleanUsername = username.toLowerCase().trim();
@@ -207,6 +230,45 @@ export async function getStudentSubmissions() {
 }
 
 // 8. Kho VIP & Kích Hoạt Mã VIP (VIP Keys)
+export async function getAllVipKeys() {
+  try {
+    const { data, error } = await supabase.from('vip_keys').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    return [];
+  }
+}
+
+export async function createVipKey(keyCode, description) {
+  const { data, error } = await supabase.from('vip_keys').insert([{ key_code: keyCode.trim(), description }]).select();
+  return { data, error };
+}
+
+export async function updateSubmissionStatus(submissionId, status, score = null, teacherFeedback = '') {
+  const { data, error } = await supabase
+    .from('student_submissions')
+    .update({ status, score, teacher_feedback: teacherFeedback })
+    .eq('id', submissionId)
+    .select();
+  return { data, error };
+}
+
+export async function deleteNewsArticle(id) {
+  return await supabase.from('news_feed').delete().eq('id', id);
+}
+
+export async function deleteLecture(id) {
+  return await supabase.from('lectures').delete().eq('id', id);
+}
+
+export async function deleteAssignment(id) {
+  return await supabase.from('assignments').delete().eq('id', id);
+}
+
+export async function createNotification(notifData) {
+  return await supabase.from('notifications').insert([notifData]).select();
+}
 export async function activateVipCode(code, userEmail) {
   try {
     // Kiểm tra mã VIP

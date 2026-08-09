@@ -16,6 +16,7 @@ import { VipVaultView } from './features/vip-vault/VipVaultView';
 import { NotificationsView } from './features/notifications/NotificationsView';
 import { ClassroomManager } from './features/classroom/ClassroomManager';
 import { SubjectManager } from './features/classroom/SubjectManager';
+import { AdminDashboard } from './features/admin/AdminDashboard';
 import { AuthModal } from './features/auth/AuthModal';
 
 export default function App() {
@@ -47,6 +48,7 @@ export default function App() {
           {activeTab === 'notifications' && <NotificationsView />}
           {activeTab === 'classroom' && <ClassroomManager />}
           {activeTab === 'subjects' && <SubjectManager />}
+          {activeTab === 'admin' && <AdminDashboard />}
         </main>
 
         {/* CHÂN TRANG (FOOTER) */}
