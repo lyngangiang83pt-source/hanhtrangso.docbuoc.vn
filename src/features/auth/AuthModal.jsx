@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { X, LogIn, Lock, Mail, Sparkles } from 'lucide-react';
+import { X, LogIn, Lock, Mail, Sparkles, UserCheck } from 'lucide-react';
 
 export function AuthModal({ isOpen, onClose }) {
-  const { signInWithGoogle, signInWithEmail } = useAuth();
+  const { signInWithGoogle, signInWithEmail, switchRole } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState(null);
@@ -13,10 +13,15 @@ export function AuthModal({ isOpen, onClose }) {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
+    setErrorMsg(null);
     const { error } = await signInWithGoogle();
     setLoading(false);
     if (error) {
-      setErrorMsg('Lỗi kết nối Google Auth: ' + error.message);
+      if (error.message?.includes('provider is not enabled') || error.status === 400) {
+        setErrorMsg('⚠️ Google Provider chưa được Bật (Enable) trên Supabase Dashboard! Thầy/Cô vui lòng bật Google Provider trong Authentication > Providers > Google, hoặc dùng nút Đăng Nhập Nhanh Demo bên dưới.');
+      } else {
+        setErrorMsg('Lỗi kết nối Google Auth: ' + error.message);
+      }
     } else {
       onClose();
     }
@@ -33,6 +38,12 @@ export function AuthModal({ isOpen, onClose }) {
     } else {
       onClose();
     }
+  };
+
+  // Đăng Nhập Nhanh Demo dành cho Giáo Viên / Học Sinh khi chưa bật Google Provider
+  const handleQuickDemoLogin = (role) => {
+    switchRole(role);
+    onClose();
   };
 
   return (
@@ -54,12 +65,12 @@ export function AuthModal({ isOpen, onClose }) {
             Đăng Nhập Hệ Thống
           </h3>
           <p className="text-xs text-slate-400 mt-1">
-            Đăng nhập để xem học liệu số, lưu sản phẩm bài nộp và phân quyền người dùng
+            Đăng nhập để trải nghiệm đầy đủ các tính năng giáo dục và phân quyền
           </p>
         </div>
 
         {errorMsg && (
-          <div className="p-3 mb-4 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs text-center font-medium">
+          <div className="p-3.5 mb-4 rounded-2xl bg-amber-500/10 text-amber-300 border border-amber-500/30 text-xs text-left leading-relaxed">
             {errorMsg}
           </div>
         )}
@@ -81,7 +92,34 @@ export function AuthModal({ isOpen, onClose }) {
             <span className="font-semibold text-sm">Continue with Google</span>
           </button>
 
-          <div className="relative flex py-2 items-center">
+          {/* KHU VỰC ĐĂNG NHẬP NHANH TEST DEMO */}
+          <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 space-y-2">
+            <span className="text-[10px] uppercase font-extrabold text-indigo-400 tracking-wider block text-center">
+              ⚡ Đăng Nhập Nhanh Test Giao Diện (Không Cần Mật Khẩu)
+            </span>
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              <button
+                onClick={() => handleQuickDemoLogin('student')}
+                className="py-2 px-1 rounded-xl text-[11px] font-semibold bg-slate-900 hover:bg-slate-800 text-indigo-300 border border-indigo-500/20"
+              >
+                🎓 Học Sinh
+              </button>
+              <button
+                onClick={() => handleQuickDemoLogin('teacher')}
+                className="py-2 px-1 rounded-xl text-[11px] font-semibold bg-slate-900 hover:bg-slate-800 text-purple-300 border border-purple-500/20"
+              >
+                👩‍🏫 Giáo Viên
+              </button>
+              <button
+                onClick={() => handleQuickDemoLogin('admin')}
+                className="py-2 px-1 rounded-xl text-[11px] font-semibold bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/20"
+              >
+                ⚙️ Admin
+              </button>
+            </div>
+          </div>
+
+          <div className="relative flex py-1 items-center">
             <div className="flex-grow border-t border-slate-800"></div>
             <span className="flex-shrink mx-4 text-[10px] uppercase font-bold tracking-widest text-slate-500">Hoặc Đăng Nhập Email</span>
             <div className="flex-grow border-t border-slate-800"></div>
@@ -113,7 +151,7 @@ export function AuthModal({ isOpen, onClose }) {
               disabled={loading}
               className="w-full py-3 rounded-xl font-bold text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all"
             >
-              Đăng Nhập Vẫn Tiếp Tục
+              Đăng Nhập Bằng Email
             </button>
           </form>
         </div>
